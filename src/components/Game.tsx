@@ -52,17 +52,16 @@ const Game = () => {
 
   const initializeGame = () => {
     if (!canvasRef.current || !containerRef.current || !window.THREE) return;
-
-    // Create a local reference to THREE to simplify code
     const THREE = window.THREE;
     
     // Get the container dimensions
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
-    // Create Three.js scene, camera, and renderer
+    // Create modern scene with fog for depth
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x2c3e50);
+    scene.background = new THREE.Color(0x1a1a1a); // Darker background
+    scene.fog = new THREE.Fog(0x1a1a1a, 15, 30); // Add fog for depth
 
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.set(0, 15, 15);
@@ -73,69 +72,104 @@ const Game = () => {
       antialias: true,
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
-    // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Enhanced lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
     
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 7.5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
     scene.add(directionalLight);
 
-    // Create a grid to represent the game board
-    const gridHelper = new THREE.GridHelper(20, 20);
+    // Add point lights for better atmosphere
+    const pointLight1 = new THREE.PointLight(0x00ff00, 0.5, 15);
+    pointLight1.position.set(5, 5, 5);
+    scene.add(pointLight1);
+
+    const pointLight2 = new THREE.PointLight(0x0000ff, 0.5, 15);
+    pointLight2.position.set(-5, 5, -5);
+    scene.add(pointLight2);
+
+    // Modern grid with glow
+    const gridHelper = new THREE.GridHelper(20, 20, 0x404040, 0x404040);
+    const gridMaterial = new THREE.LineBasicMaterial({
+      color: 0x404040,
+      transparent: true,
+      opacity: 0.3,
+    });
+    gridHelper.material = gridMaterial;
     scene.add(gridHelper);
 
-    // Create Pacman
+    // Get the top team's color for Pacman
+    const topTeam = [...teams].sort((a, b) => b.treesPlanted - a.treesPlanted)[0];
+    const pacmanColor = topTeam ? topTeam.color : '#FFFF00';
+
+    // Create modern Pacman with emissive material
     const pacmanGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-    const pacmanMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 });
+    const pacmanMaterial = new THREE.MeshStandardMaterial({ 
+      color: pacmanColor,
+      emissive: pacmanColor,
+      emissiveIntensity: 0.2,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
     const pacman = new THREE.Mesh(pacmanGeometry, pacmanMaterial);
     pacman.position.set(0, 0.5, 0);
+    pacman.castShadow = true;
     scene.add(pacman);
 
-    // Create a more beautiful tree function
+    // Create a more beautiful tree function with modern materials
     const createTree = (x: number, z: number) => {
-      // Tree group
       const tree = new THREE.Group();
       tree.position.set(x, 0, z);
       
-      // Multiple trunk sections for more natural look
+      // Modern trunk with better materials
       const trunkGeometry = new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8);
       const trunkMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x8B4513,
-        roughness: 0.9,
-        metalness: 0.1,
+        color: 0x4a3728,
+        roughness: 0.7,
+        metalness: 0.2,
       });
       const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
       trunk.position.y = 0.35;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
       tree.add(trunk);
       
-      // Multiple layers of leaves for a fuller look
       const createLeaves = (y: number, size: number, color: number) => {
         const leavesGeometry = new THREE.ConeGeometry(size, size * 1.2, 8);
         const leavesMaterial = new THREE.MeshStandardMaterial({ 
           color: color,
-          roughness: 0.8,
-          metalness: 0.0,
+          roughness: 0.6,
+          metalness: 0.1,
+          emissive: color,
+          emissiveIntensity: 0.05,
         });
         const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
         leaves.position.y = y;
+        leaves.castShadow = true;
+        leaves.receiveShadow = true;
         return leaves;
       };
       
-      // Add multiple leaf layers with different shades of green
-      trunk.add(createLeaves(0.5, 0.35, 0x1e7942)); // bottom layer, darker
-      trunk.add(createLeaves(0.7, 0.3, 0x228B22));  // middle layer
-      trunk.add(createLeaves(0.9, 0.2, 0x2ea043));  // top layer, lighter
+      // Modern color palette for trees
+      trunk.add(createLeaves(0.5, 0.35, 0x2d5a27));
+      trunk.add(createLeaves(0.7, 0.3, 0x3a7634));
+      trunk.add(createLeaves(0.9, 0.2, 0x4c9445));
       
-      // Animation - start small and grow
+      // Smooth grow animation
       tree.scale.set(0.01, 0.01, 0.01);
       
       const startTime = Date.now();
       const growTree = () => {
         const elapsed = Date.now() - startTime;
-        const growFactor = Math.min(1, elapsed / 1000); // 1 second to grow
+        const growFactor = Math.min(1, elapsed / 1000);
         
         tree.scale.set(growFactor, growFactor, growFactor);
         
@@ -146,9 +180,7 @@ const Game = () => {
       
       growTree();
       
-      // Random rotation for variety
       tree.rotation.y = Math.random() * Math.PI * 2;
-      
       scene.add(tree);
       
       // Update game state
@@ -206,10 +238,20 @@ const Game = () => {
     }, 100);
     
     // Render loop
-    const animate = () => {
+    function animate() {
       requestAnimationFrame(animate);
+
+      // Smooth automatic rotation
+      if (!gameState.isPaused && gameState.autoPlay) {
+        pacman.rotation.y += 0.02;
+        pointLight1.position.x = Math.sin(Date.now() * 0.001) * 5;
+        pointLight1.position.z = Math.cos(Date.now() * 0.001) * 5;
+        pointLight2.position.x = Math.sin(Date.now() * 0.001 + Math.PI) * 5;
+        pointLight2.position.z = Math.cos(Date.now() * 0.001 + Math.PI) * 5;
+      }
+
       renderer.render(scene, camera);
-    };
+    }
     animate();
     
     // Handle window resize
