@@ -1,10 +1,14 @@
 
 import { useState, useEffect } from "react";
 import { teams, TeamStats } from "../data/teams";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { ScrollArea } from "./ui/scroll-area";
 
 const StatsPanel = () => {
   const [totalTrees, setTotalTrees] = useState(0);
   const [totalDotBalls, setTotalDotBalls] = useState(0);
+  const [previousRanks, setPreviousRanks] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState<'all'|'trees'|'dots'>('all');
   
   // Calculate totals - update dynamically
@@ -21,7 +25,7 @@ const StatsPanel = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Sort teams based on active tab
+  // Sort teams and track ranking changes
   const sortedTeams = [...teams].sort((a, b) => {
     if (activeTab === 'trees') {
       return b.treesPlanted - a.treesPlanted;
@@ -31,8 +35,21 @@ const StatsPanel = () => {
     return (b.treesPlanted + b.dotBallsPlayed) - (a.treesPlanted + a.dotBallsPlayed);
   });
 
+  // Update previous ranks when sorting changes
+  useEffect(() => {
+    const newRanks: { [key: number]: number } = {};
+    sortedTeams.forEach((team, index) => {
+      if (previousRanks[team.id] === undefined) {
+        newRanks[team.id] = index;
+      } else {
+        newRanks[team.id] = previousRanks[team.id];
+      }
+    });
+    setPreviousRanks(newRanks);
+  }, [activeTab]);
+
   return (
-    <div className="w-80 h-full bg-white/20 backdrop-blur-md p-6 overflow-y-auto border-l border-green-800/20 shadow-xl">
+    <div className="w-96 h-full bg-white/20 backdrop-blur-md p-6 overflow-hidden border-l border-green-800/20 shadow-xl">
       <h2 className="text-2xl font-bold mb-4 text-green-800">IPL Green Stats</h2>
       
       <div className="mb-6 bg-green-50 p-4 rounded-lg shadow-inner">
@@ -69,40 +86,53 @@ const StatsPanel = () => {
         </button>
       </div>
       
-      <h3 className="text-xl font-semibold mb-3 text-green-800">IPL Teams</h3>
-      <div className="space-y-4">
-        {sortedTeams.map((team) => (
-          <TeamCard key={team.id} team={team} />
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const TeamCard = ({ team }: { team: TeamStats }) => {
-  return (
-    <div className="bg-white/80 rounded-lg p-3 shadow-sm">
-      <div className="flex items-center">
-        <div 
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-          style={{ backgroundColor: team.color }}
-        >
-          {team.logo}
-        </div>
-        <div className="ml-3">
-          <h4 className="font-semibold">{team.name}</h4>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-        <div className="flex flex-col">
-          <span className="text-green-700 font-medium">{team.treesPlanted}</span>
-          <span className="text-xs text-gray-600">Trees</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-blue-700 font-medium">{team.dotBallsPlayed}</span>
-          <span className="text-xs text-gray-600">Dot Balls</span>
-        </div>
-      </div>
+      <ScrollArea className="h-[calc(100vh-280px)]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">#</TableHead>
+              <TableHead>Team</TableHead>
+              <TableHead className="text-right">Trees</TableHead>
+              <TableHead className="text-right">Dots</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedTeams.map((team, index) => {
+              const previousRank = previousRanks[team.id] || index;
+              const rankChange = previousRank - index;
+              
+              return (
+                <TableRow key={team.id} className="hover:bg-white/40">
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1">
+                      {index + 1}
+                      {rankChange > 0 && <TrendingUp className="w-4 h-4 text-green-500" />}
+                      {rankChange < 0 && <TrendingDown className="w-4 h-4 text-red-500" />}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-bold"
+                        style={{ backgroundColor: team.color }}
+                      >
+                        {team.logo}
+                      </div>
+                      <span className="font-medium">{team.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-green-700">
+                    {team.treesPlanted}
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-blue-700">
+                    {team.dotBallsPlayed}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </ScrollArea>
     </div>
   );
 };
